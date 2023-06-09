@@ -1,4 +1,8 @@
 <script>
+// TODO 增加提前还款判断
+// TODO 实现提前还款其他方法
+// TODO 增加提前还款其他明细
+// TODO 增加还款每月明细，并提供 excel 下载
 export default {
   data() {
     return {
@@ -7,6 +11,14 @@ export default {
         EPIP: "1", // 等额本息
         PREP: "2", // 提前还款
       },
+      prepaymentModeEnum: {
+        ALL: "0", // 一次性还清
+        PARTIAL: "1", // 部分还清
+      },
+      partialPrepaymentMethodEnum: {
+        SAMEA: "0", // 每月还款额不变，缩短期限
+        LESSA: "1", // 减少每月还款额，期限不变
+      },
       repaymentMode: "0", // 还款方式：0: 等额本金, 1: 等额本息, 2: 提前还款
       amount: null, // 贷款总额
       periods: null, // 贷款期数
@@ -14,6 +26,12 @@ export default {
       monthlyRate: 0.0, // 月利率
       totalInterest: null, // 总利息
       A: null, // 等额本息每月固定还款额
+      prepaymentMode: "0",
+      partialPrepaymentMethod: "0",
+      firstPaymentDate: null,
+      prepaymentDate: null,
+      prepaymentAmount: null,
+      prepaymentPeriods: null,
     };
   },
   methods: {
@@ -25,6 +43,12 @@ export default {
       this.monthlyRate = 0;
       this.totalInterest = null;
       this.A = null;
+      this.prepaymentMode = "0";
+      this.partialPrepaymentMethod = "0";
+      this.firstPaymentDate = null;
+      this.prepaymentDate = null;
+      this.prepaymentAmount = null;
+      this.prepaymentPeriods = null;
     },
 
     equal_principal_payments() {
@@ -38,7 +62,7 @@ export default {
         tempInterest += curInterest;
         remain -= tempA;
       }
-      return tempInterest;
+      this.totalInterest = tempInterest;
     },
 
     equal_principal_and_interest_payment_computer() {
@@ -76,15 +100,57 @@ export default {
         total_interest += this.monthlyRate * remain;
         remain = (1 + this.monthlyRate) * remain - this.A;
       }
-      return total_interest;
+      this.totalInterest = total_interest;
     },
 
     month_delta() {
-      // TODO 计算时间间隔月数
+      // 计算时间间隔月数
+      const start = new Date(this.firstPaymentDate);
+      const end = new Date(this.prepaymentDate);
+      const end_month =
+        (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() + 1;
+      return end_month - start.getMonth() + 1;
     },
 
-    prepayment(first_payment_date, prepayment_date, prepayment_amount) {
-      // TODO 提前还款
+    prepaymentAll() {},
+
+    prepaymentpartialSameA() {
+      const origin_total_interest = this.equal_principal_and_interest_payment();
+      const months = this.month_delta();
+
+      let remain = this.amount;
+      let total_interest = 0;
+      for (let i = 0; i < months; i++) {
+        total_interest += this.monthlyRate * remain;
+        remain = (1 + this.monthlyRate) * remain - this.A;
+      }
+      remain -= this.prepaymentAmount;
+      let remain_periods = 0;
+      while (remain > 0) {
+        total_interest += this.monthlyRate * remain;
+        remain = (1 + this.monthlyRate) * remain - this.A;
+        remain_periods += 1;
+      }
+      this.totalInterest = total_interest;
+      this.prepaymentPeriods = months + remain_periods;
+    },
+
+    prepaymentpartialLessA() {},
+
+    prepayment() {
+      // 提前还款
+      if (this.prepaymentMode === this.prepaymentModeEnum.ALL) {
+        this.prepaymentAll();
+      } else {
+        if (
+          this.partialPrepaymentMethod ===
+          this.partialPrepaymentMethodEnum.SAMEA
+        ) {
+          this.prepaymentpartialSameA();
+        } else {
+          this.prepaymentpartialLessA();
+        }
+      }
     },
 
     checklegal() {
@@ -109,15 +175,13 @@ export default {
       switch (this.repaymentMode) {
         case this.repaymentModeEnum.EPP:
           console.log("等额本金");
-          this.totalInterest = this.equal_principal_payments();
           break;
         case this.repaymentModeEnum.EPIP:
           console.log("等额本息");
-          this.totalInterest = this.equal_principal_and_interest_payment();
           break;
         case this.repaymentModeEnum.PREP:
           console.log("提前还款");
-          this.totalInterest = this.prepayment();
+          this.prepayment();
           break;
         default:
           console.log(`还款方式：${this.repaymentMode} 错误`);
@@ -195,6 +259,73 @@ export default {
         <span class="input-group-text">年利率</span>
         <input type="number" class="form-control" v-model="annualRate" />
         <span class="input-group-text">%</span>
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="repaymentMode === repaymentModeEnum.PREP"
+      >
+        <span class="input-group-text">提前还款时间</span>
+        <input type="date" class="form-control" v-model="prepaymentDate" />
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="repaymentMode === repaymentModeEnum.PREP"
+      >
+        <span class="input-group-text">首次还款时间</span>
+        <input type="date" class="form-control" v-model="firstPaymentDate" />
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="repaymentMode === repaymentModeEnum.PREP"
+      >
+        <span class="input-group-text">提前还款方式</span>
+        <select
+          class="form-select"
+          aria-label="提前还款方式"
+          v-model="prepaymentMode"
+        >
+          <option :value="prepaymentModeEnum.ALL" selected>一次全部还清</option>
+          <option :value="prepaymentModeEnum.PARTIAL">部分还清</option>
+        </select>
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="prepaymentMode === prepaymentModeEnum.PARTIAL"
+      >
+        <span class="input-group-text">部分还清处理方式</span>
+        <select
+          class="form-select"
+          aria-label="部分还清处理方式"
+          v-model="partialPrepaymentMethod"
+        >
+          <option :value="partialPrepaymentMethodEnum.SAMEA" selected>
+            每月还款额不变，缩短期限
+          </option>
+          <option :value="partialPrepaymentMethodEnum.LESSA">
+            减少每月还款额，期限不变
+          </option>
+        </select>
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="repaymentMode === repaymentModeEnum.PREP"
+      >
+        <span class="input-group-text">提前还款额</span>
+        <input type="number" class="form-control" v-model="prepaymentAmount" />
+        <span class="input-group-text">万元</span>
+      </div>
+      <div
+        class="input-group mb-3"
+        v-if="repaymentMode === repaymentModeEnum.PREP"
+      >
+        <span class="input-group-text">总期数</span>
+        <input
+          type="text"
+          class="form-control"
+          readonly
+          disabled
+          v-model="prepaymentPeriods"
+        />
       </div>
       <div class="input-group mb-3">
         <span class="input-group-text">总利息</span>
