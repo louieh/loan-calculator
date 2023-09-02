@@ -1,4 +1,5 @@
 <script>
+// TODO 结果保留小数
 // TODO 增加提前还款判断
 // TODO 实现提前还款其他方法
 // TODO 增加提前还款其他明细
@@ -52,7 +53,7 @@ export default {
     },
 
     equal_principal_payments() {
-      // 等额本金
+      // 等额本金顶级方法
       const tempA = this.amount / this.periods; // 每月固定还本金额度
       let remain = this.amount;
       let tempInterest = 0;
@@ -67,7 +68,7 @@ export default {
 
     equal_principal_and_interest_payment_computer() {
       /**
-       * 等额本息每月固定还款额
+       * 等额本息每月固定还款额计算器
        * 计算等额本息还款方式每月固定还款额，单位：万元
        * 假设贷款金额为12万元, 12期还清，设a为剩余还款数，A为每月固定还款额，则：
        * a0 = 12
@@ -92,7 +93,7 @@ export default {
     },
 
     equal_principal_and_interest_payment() {
-      // 等额本息
+      // 等额本息顶级方法
       this.A = this.equal_principal_and_interest_payment_computer();
       let remain = this.amount;
       let total_interest = 0;
@@ -112,9 +113,12 @@ export default {
       return end_month - start.getMonth() + 1;
     },
 
-    prepaymentAll() {},
+    prepaymentAll() {
+      // 提前还款：一次性还清
+    },
 
     prepaymentpartialSameA() {
+      // 提前还款：每月还款额不变，缩短期限
       const origin_total_interest = this.equal_principal_and_interest_payment();
       const months = this.month_delta();
 
@@ -135,7 +139,9 @@ export default {
       this.prepaymentPeriods = months + remain_periods;
     },
 
-    prepaymentpartialLessA() {},
+    prepaymentpartialLessA() {
+      // 提前还款：减少每月还款额，期限不变
+    },
 
     prepayment() {
       // 提前还款
@@ -175,9 +181,11 @@ export default {
       switch (this.repaymentMode) {
         case this.repaymentModeEnum.EPP:
           console.log("等额本金");
+          this.equal_principal_payments();
           break;
         case this.repaymentModeEnum.EPIP:
           console.log("等额本息");
+          this.equal_principal_and_interest_payment();
           break;
         case this.repaymentModeEnum.PREP:
           console.log("提前还款");
